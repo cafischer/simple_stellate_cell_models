@@ -46,7 +46,7 @@ class Izhikevich:
         def f(ts, x):
             V_ = x[0]
             u_ = x[1]
-            derivatives = self.dynamical_system_equations(V_, u_, I_ext(ts))
+            derivatives = self.dynamical_system_equations(V_, u_, I_ext(ts)*1000) # I_ext from nA to pA
             return derivatives
 
         ode_solver = ode(f)
@@ -77,7 +77,7 @@ class Izhikevich:
         assert self.V0 is not None and self.u0 is not None, \
             "set V0 and u0 beforehand via set_simulation_params"
         t = np.arange(0, tstop + dt, dt)
-        i_inj_array = np.array([i_inj(ts) for ts in t])
+        i_inj_array = np.array([i_inj(ts) for ts in t]) * 1000  # from nA to pA
         v = np.zeros(len(t))
         u = np.zeros(len(t))
         v[0] = self.V0
@@ -132,7 +132,7 @@ if __name__ == '__main__':
     # cell.set_simulation_params({'V0': -70, 'u0': -70 * cell.b, })
     # tstop = 100  # ms
     # dt = 0.1  # ms
-    # I_ext = lambda x: 20 if 10 <= x <= 12 else 0  # pA
+    # I_ext = lambda x: 0.020 if 10 <= x <= 12 else 0  # pA
     # v, t = cell.simulate(dt, tstop, I_ext)
     # v, t = cell.simulate_foward_euler(dt, tstop, I_ext)
     # plt.figure()
@@ -145,7 +145,7 @@ if __name__ == '__main__':
 
     tstop = 1400  # ms
     dt = 0.01  # ms
-    I_ext = lambda x: -500 if 100 <= x <= 1200 else 0  # pA
+    I_ext = lambda x: 0.500 if 100 <= x <= 1200 else 0  # pA
 
     v, t = cell.simulate(dt, tstop, I_ext)
     #v, t = cell.simulate_foward_euler(tstop, dt, I_ext, V0, u0)

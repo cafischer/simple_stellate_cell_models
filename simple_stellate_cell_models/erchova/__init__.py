@@ -4,6 +4,7 @@ from scipy.integrate import ode
 import matplotlib.pyplot as pl
 from simple_stellate_cell_models.test_on_stimuli import get_zap_stimulus
 from cell_characteristics import to_idx
+from scipy.optimize import curve_fit
 
 
 def fun_for_fitting(f, c, R_l, R, L):
@@ -45,13 +46,13 @@ class Erchova:
             "set V0 and I_l0 beforehand via set_simulation_params"
         assert tstop / dt % 1 == 0
         n_timesteps = int((tstop + dt) / dt)
+        n_refractory = to_idx(self.dt_refractory, dt)
 
         V = np.zeros(n_timesteps)
         t = np.zeros(n_timesteps)
         I_l = np.zeros(n_timesteps)
         V[0] = self.V0
         I_l[0] = self.I_l0
-        n_refractory = to_idx(self.dt_refractory, dt)
 
         def f(ts, x):
             V_ = x[0]
@@ -65,15 +66,15 @@ class Erchova:
 
         i = 1
         while i < n_timesteps:
-            # TODO assert ode_solver.successful()
-            # if not ode_solver.successful():
-            #     break
+            assert ode_solver.successful()
             if V[i-1] >= (self.V_threshold - self.V_rest):  # model is set up to be around 0 not V_rest
+                n_refractory_tmp = n_refractory if i + n_refractory <= n_timesteps \
+                    else n_timesteps - (i + n_refractory)
                 V[i-1] = (self.V_peak - self.V_rest)
-                V[i:i+n_refractory] = (self.V_reset - self.V_rest)
-                I_l[i:i+n_refractory] = I_l[i-1]
-                t[i:i+n_refractory] = np.arange(i, i+n_refractory, 1) * dt
-                i += n_refractory - 1
+                V[i:i+n_refractory_tmp] = (self.V_reset - self.V_rest)
+                I_l[i:i+n_refractory_tmp] = I_l[i-1]
+                t[i:i+n_refractory_tmp] = np.arange(i, i+n_refractory_tmp, 1) * dt
+                i += n_refractory_tmp - 1
             else:
                 ode_solver.set_initial_value([V[i-1], I_l[i-1]], t[i-1])
                 # force the integrator to start a new integration at each time step (account for discontinuities in I_ext)
@@ -87,27 +88,33 @@ class Erchova:
         return V + self.V_rest, t
 
 
+def fit_model(impedance_exp, frequencies_exp, plot=False):
+    # fit parameters to impedance curve
+    impedance_to_fit = impedance_exp * 1e6  # convert impedance to Ohm
+    p_opt, _ = curve_fit(fun_for_fitting, frequencies_exp, impedance_to_fit, p0=[4e-10, 20e6, 20e6, 1e6],
+                         bounds=[0, np.inf])
+    c, R_l, R, L = p_opt
+    # unit conversions
+    c = c * 1e6  # uF
+    R_l = R_l * 1e-6  # MOhm
+    R = R * 1e-6  # MOhm
+    L = L  # Ohm * sec
+
+    if plot:
+        pl.figure()
+        pl.plot(frequencies_exp, impedance_to_fit, label='exp.')
+        pl.plot(frequencies_exp, fun_for_fitting(frequencies_exp, c, R_l, R, L), label='fit')
+        pl.ylabel('Impedance (MOhm)')
+        pl.xlabel('Frequency (Hz)')
+        pl.legend()
+        pl.show()
+    return c, R_l, R, L
+
+
 if __name__ == '__main__':
-    # # fit parameters to impedance curve
-    # impedance_exp = np.load('./impedance.npy')
-    # frequencies = np.load('./frequencies.npy')
-    # impedance_to_fit = impedance_exp * 1e6  # convert impedance to Ohm
-    # p_opt, _ = curve_fit(fun_for_fitting, frequencies, impedance_to_fit, p0=[4e-10, 20e6, 20e6, 1e6],
-    #                      bounds=[0, np.inf])
-    # c, R_l, R, L = p_opt
-    # c = c * 1e6  # uF
-    # R_l = R_l * 1e-6  # MOhm
-    # R = R * 1e-6  # MOhm
-    # L = L  # Ohm * sec
-    # print c, R_l, R, L
-    #
-    # pl.figure()
-    # pl.plot(frequencies, impedance_to_fit, label='exp.')
-    # pl.plot(frequencies, fun_for_fitting(frequencies, c, R_l, R, L), label='fit')
-    # pl.ylabel('Impedance (MOhm)')
-    # pl.xlabel('Frequency (Hz)')
-    # pl.legend()
-    # pl.show()
+    impedance_exp = np.load('./impedance.npy')
+    frequencies_exp = np.load('./frequencies.npy')
+    c, R_l, R, L = fit_model(impedance_exp, frequencies_exp)
 
     cell = Erchova()  # Erchova(c, R_l, R, L)
     cell.set_simulation_params({'V0': 0, 'I_l0': 0})
@@ -162,7 +169,6 @@ if __name__ == '__main__':
     #
     # pl.figure()
     # pl.plot(frequencies, impedance_exp, label='exp.')
-    # pl.plot(frequencies, fun_for_fitting(frequencies, *p_opt) * 1e-6, label='fit')
     # pl.plot(frequencies2, imp_smooth, label='model')
     # pl.legend()
     # pl.ylabel('Impedance (MOhm)')

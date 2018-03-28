@@ -60,7 +60,7 @@ class LIF:
             V_ = x[0]
             g_ADP_ = x[1]
             g_AHP_ = x[2]
-            derivatives = self.dynamical_system_equations(V_, g_ADP_, g_AHP_, I_ext(ts))
+            derivatives = self.dynamical_system_equations(V_, g_ADP_, g_AHP_, I_ext(ts)*1000)  # I_ext from nA to pA
             return derivatives
     
         ode_solver = ode(f)
@@ -69,7 +69,7 @@ class LIF:
     
         i = 1
         counter_refractory = 0
-        while ode_solver.t <= tstop:
+        while i < n_timesteps:
             assert ode_solver.successful()
             if counter_refractory != 0:
                 ode_solver.set_initial_value([self.V_reset, g_ADP[i-1], g_AHP[i-1]], t[i-1])
@@ -107,8 +107,8 @@ if __name__ == '__main__':
 
     dt = 0.01
     tstop = 100
-    I_ext = lambda x: 1700 if 5 <= x <= 15 else 0  # pA
-    #I_ext = lambda x: 800 if 10 <= x <= 100 else 0  # pA
+    I_ext = lambda x: 1.7 if 5 <= x <= 15 else 0  # pA
+    #I_ext = lambda x: 0.8 if 10 <= x <= 100 else 0  # pA
     V, t = lif_cell.simulate(dt, tstop, I_ext)
 
 
